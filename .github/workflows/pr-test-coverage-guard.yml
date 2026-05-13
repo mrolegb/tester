@@ -1,0 +1,67 @@
+name: PR Test Coverage Guard
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Detect changed source/test files
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          SRC_COUNT=$(echo "$CHANGED" | grep -E '^src/.*\.(ts|tsx|js|jsx)$' | wc -l || true)
+          TEST_COUNT=$(echo "$CHANGED" | grep -E '^tests/.*\.test\.(ts|tsx|js|jsx)$' | wc -l || true)
+
+          echo "src_count=$SRC_COUNT" >> "$GITHUB_OUTPUT"
+          echo "test_count=$TEST_COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Require tests when source code changes
+        if: steps.changes.outputs.src_count != '0' && steps.changes.outputs.test_count == '0'
+        run: |
+          echo "❌ Source code changed, but no test files were updated."
+          echo "Please add/update tests in tests/*.test.ts (or explain why not needed)."
+          exit 1
+
+      - name: Run tests with coverage
+        if: steps.changes.outputs.src_count != '0'
+        run: npm test -- --coverage --runInBand
+
+      - name: Coverage summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            node -e "const fs=require('fs');const s=JSON.parse(fs.readFileSync('coverage/coverage-summary.json','utf8'));const t=s.total||{};console.log('Coverage total:');console.log('lines',t.lines?.pct);console.log('statements',t.statements?.pct);console.log('functions',t.functions?.pct);console.log('branches',t.branches?.pct);"
+          else
+            echo "No coverage summary file generated."
+          fi
