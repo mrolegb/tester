@@ -56,12 +56,13 @@ jobs:
         if: steps.changes.outputs.src_count != '0'
         run: npm test -- --coverage --runInBand
 
-      - name: Coverage summary
-        if: always()
+      - name: Coverage summary + 90% gate
+        if: steps.changes.outputs.src_count != '0'
         shell: bash
         run: |
-          if [ -f coverage/coverage-summary.json ]; then
-            node -e "const fs=require('fs');const s=JSON.parse(fs.readFileSync('coverage/coverage-summary.json','utf8'));const t=s.total||{};console.log('Coverage total:');console.log('lines',t.lines?.pct);console.log('statements',t.statements?.pct);console.log('functions',t.functions?.pct);console.log('branches',t.branches?.pct);"
-          else
-            echo "No coverage summary file generated."
+          if [ ! -f coverage/coverage-summary.json ]; then
+            echo "❌ No coverage summary file generated."
+            exit 1
           fi
+
+          node -e "const fs=require('fs');const s=JSON.parse(fs.readFileSync('coverage/coverage-summary.json','utf8'));const t=s.total||{};const m=90;const keys=['lines','statements','functions','branches'];console.log('Coverage total:');for(const k of keys){console.log(k,t[k]?.pct);}const bad=keys.filter(k=>(t[k]?.pct??0)<m);if(bad.length){console.error('❌ Coverage below 90% for: '+bad.join(', '));process.exit(1);}console.log('✅ Coverage is >= 90% for all metrics.');"
