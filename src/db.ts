@@ -1,6 +1,14 @@
-const Database = require('better-sqlite3');
+import Database from 'better-sqlite3';
 
-function initDb(dbPath = 'data.sqlite') {
+export type UserRow = {
+  id: number;
+  name: string;
+  email: string;
+};
+
+export type Db = Database.Database;
+
+export function initDb(dbPath = 'data.sqlite'): Db {
   const db = new Database(dbPath);
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -11,5 +19,3 @@ function initDb(dbPath = 'data.sqlite') {
   `);
   return db;
 }
-
-module.exports = { initDb };
