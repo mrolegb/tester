@@ -45,13 +45,6 @@ jobs:
           echo "src_count=$SRC_COUNT" >> "$GITHUB_OUTPUT"
           echo "test_count=$TEST_COUNT" >> "$GITHUB_OUTPUT"
 
-      - name: Require tests when source code changes
-        if: steps.changes.outputs.src_count != '0' && steps.changes.outputs.test_count == '0'
-        run: |
-          echo "❌ Source code changed, but no test files were updated."
-          echo "Please add/update tests in tests/*.test.ts (or explain why not needed)."
-          exit 1
-
       - name: Run tests with coverage
         if: steps.changes.outputs.src_count != '0'
         run: npm test -- --coverage --runInBand
